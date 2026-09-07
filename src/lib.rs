@@ -3,6 +3,7 @@
 //! Quantizers are built by composing [`Primitive`] stages.
 //! The harness only interacts with the [`Quantizer`] interface.
 
+pub mod candidates;
 pub(crate) mod math;
 pub mod metrics;
 mod pipeline;
