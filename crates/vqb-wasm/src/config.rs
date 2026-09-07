@@ -42,10 +42,26 @@ pub struct RunConfig {
     pub n_eval: Option<usize>,
 }
 
-/// One method entry: a quantizer key plus its params. A param whose value is an
-/// array is a *sweep* -- upstream semantics -- so `{"b": [2, 4]}` is two runs.
+/// One method entry.
+///
+/// Either a built-in family by key (`{"name": "minmax", "b": 4}`) or a custom
+/// pipeline composed from primitives (`{"name": "custom", "stages": [...]}`).
+/// A param whose value is an array is a *sweep* -- upstream semantics -- so
+/// `{"b": [2, 4]}` is two runs.
 #[derive(Debug, Deserialize)]
 pub struct MethodConfig {
+    pub name: String,
+    /// Present only for a custom pipeline. Stages run in order, each feeding
+    /// the next; the chain must end in a rounder or nothing is quantized.
+    #[serde(default)]
+    pub stages: Option<Vec<StageConfig>>,
+    #[serde(flatten)]
+    pub params: BTreeMap<String, Value>,
+}
+
+/// One stage of a custom pipeline: a primitive key plus its params.
+#[derive(Debug, Deserialize)]
+pub struct StageConfig {
     pub name: String,
     #[serde(flatten)]
     pub params: BTreeMap<String, Value>,
@@ -91,6 +107,11 @@ impl MethodConfig {
 
     /// A human-readable label for one expanded param set: `MinMax (b=4)`.
     pub fn label(&self, params: &vqb::Params) -> String {
+        if let Some(stages) = &self.stages {
+            // A composed pipeline has no family name, so name it by its shape.
+            let chain: Vec<&str> = stages.iter().map(|s| s.name.as_str()).collect();
+            return format!("{} [{}]", self.name, chain.join(" -> "));
+        }
         let family = vqb::catalog::display(&self.name);
         if params.is_empty() {
             return family.to_string();

@@ -17,6 +17,7 @@ macro_rules! primitives {
 }
 
 pub mod catalog;
+pub mod registry;
 mod conditioners;
 mod rounders;
 mod splitters;

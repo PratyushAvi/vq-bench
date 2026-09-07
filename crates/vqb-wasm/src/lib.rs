@@ -9,6 +9,7 @@
 
 mod config;
 mod evaluate;
+mod pipeline;
 
 use ndarray::{Array2, ArrayView2};
 use serde_json::{json, Value};
@@ -35,6 +36,28 @@ pub fn list_quantizers() -> String {
         })
         .collect();
     to_json(&Value::Array(families))
+}
+
+/// Every primitive a custom pipeline can name: key, display name, params, and
+/// a one-line description.
+///
+/// Read from the registry, so a primitive added upstream appears in the builder
+/// without a change here. Splitters are absent: they fan out into branch
+/// pipelines, which a linear chain cannot express.
+#[wasm_bindgen]
+pub fn list_primitives() -> String {
+    let primitives: Vec<Value> = vqb::primitive_registry::primitives()
+        .into_iter()
+        .map(|p| {
+            json!({
+                "key": p.key,
+                "display": p.display,
+                "params": p.params,
+                "describe": p.describe,
+            })
+        })
+        .collect();
+    to_json(&Value::Array(primitives))
 }
 
 /// Every metric this build can report, with a one-line description.
@@ -85,21 +108,28 @@ pub fn validate_config(config_json: &str, dim: usize) -> String {
     }
 
     for method in &config.methods {
-        if !vqb::catalog::is_known(&method.name) {
+        let custom = method.stages.is_some();
+        if !custom && !vqb::catalog::is_known(&method.name) {
             errors.push(format!("unknown quantizer: {}", method.name));
             continue;
         }
         for params in method.expand() {
             // Names the family does not accept. A bad name also makes `build`
             // fail, so reporting that too would say the same thing twice.
-            let bad_names = vqb::catalog::verify_params(&method.name, &params);
+            // A custom pipeline has no family, so its params are checked per
+            // stage by the registry instead.
+            let bad_names = if custom {
+                Vec::new()
+            } else {
+                vqb::catalog::verify_params(&method.name, &params)
+            };
             if !bad_names.is_empty() {
                 errors.extend(bad_names.into_iter().map(|p| format!("{}: {p}", method.name)));
                 continue;
             }
             // Values it rejects -- only checkable by building it.
             if dim > 0 {
-                if let Err(err) = vqb::catalog::build(&method.name, &params, config.seed, dim) {
+                if let Err(err) = pipeline::build(method, &params, config.seed, dim) {
                     errors.push(format!("{}: {}", method.label(&params), full_chain(&err)));
                 }
             }
@@ -196,8 +226,8 @@ fn try_run(
 
     for method in &config.methods {
         for params in method.expand() {
-            let quantizer = vqb::catalog::build(&method.name, &params, config.seed, dim)
-                .map_err(|e| format!("{}: {e}", method.name))?;
+            let quantizer = pipeline::build(method, &params, config.seed, dim)
+                .map_err(|e| format!("{}: {}", method.name, full_chain(&e)))?;
             let mut result = evaluate(
                 quantizer.as_ref(),
                 &data,

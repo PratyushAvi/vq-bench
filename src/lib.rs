@@ -21,6 +21,7 @@ pub use math::matmul;
 pub use pipeline::Pipeline;
 pub use primitive::Primitive;
 pub use primitives::catalog as primitive_catalog;
+pub use primitives::registry as primitive_registry;
 pub use primitives::*;
 pub use quantizer::{byte_split, AsQuantizer, Params, Quantizer};
 pub use quantizers::catalog;
