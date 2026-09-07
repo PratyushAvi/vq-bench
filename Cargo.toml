@@ -10,7 +10,7 @@ name = "vqb"
 path = "src/bin/vqb/main.rs"
 
 [dependencies]
-faer = "0.24.1"
+faer = { version = "0.24.1", default-features = false, features = ["std", "sparse-linalg", "rand", "npy"] }
 ndarray = "0.16"
 rayon = "1"
 rand = "0.10.1"

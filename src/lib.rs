@@ -4,6 +4,7 @@
 //! The harness only interacts with the [`Quantizer`] interface.
 
 pub(crate) mod math;
+pub mod metrics;
 mod pipeline;
 mod primitive;
 mod primitives;

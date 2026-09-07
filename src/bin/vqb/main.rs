@@ -11,6 +11,10 @@ mod paths;
 mod registry;
 mod view;
 
+// Metrics moved into the library (`vqb::metrics`) so non-CLI consumers -- the wasm
+// wrapper -- can compute them too. Aliased so existing `crate::bench` uses stand.
+pub(crate) use vqb::metrics as bench;
+
 // Counting allocator so the runner can measure peak heap during encoding. Must be
 // installed in every build, independent of the `hdf5` feature.
 #[global_allocator]
@@ -20,8 +24,6 @@ static GLOBAL: mem::Counting = mem::Counting;
 // (`show`, `data list/info`, `run --dry-run`) still builds without the system lib.
 #[cfg(feature = "hdf5")]
 mod aggregate;
-#[cfg(feature = "hdf5")]
-mod bench;
 #[cfg(feature = "hdf5")]
 mod codes;
 #[cfg(feature = "hdf5")]
