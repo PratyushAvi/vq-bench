@@ -10,7 +10,7 @@
 mod config;
 mod evaluate;
 
-use ndarray::Array2;
+use ndarray::{Array2, ArrayView2};
 use serde_json::{json, Value};
 use wasm_bindgen::prelude::*;
 
@@ -111,6 +111,53 @@ pub fn validate_config(config_json: &str, dim: usize) -> String {
     } else {
         to_json(&json!({ "ok": false, "errors": errors }))
     }
+}
+
+/// Exact top-`l` neighbors for each query, as a flat `n_eval * l` index array.
+///
+/// A dataset that ships no ground truth needs this before it can be scored
+/// against. It is the same block-folded search the native CLI runs, so the
+/// candidate pools a browser builds match the ones `vqb data get` would write.
+///
+/// `on_progress` is called with `(rows_done, rows_total)` as the base is folded
+/// in; pass `null` for none. The search is O(n_base * n_eval * dim), so a large
+/// base takes real time -- run it in a worker and show the progress.
+#[wasm_bindgen]
+pub fn top_neighbors(
+    base: &[f32],
+    eval: &[f32],
+    dim: usize,
+    l: usize,
+    on_progress: Option<js_sys::Function>,
+) -> Result<Vec<u32>, JsError> {
+    if dim == 0 {
+        return Err(JsError::new("dim must be non-zero"));
+    }
+    if base.len() % dim != 0 || eval.len() % dim != 0 {
+        return Err(JsError::new("base/eval lengths must be multiples of dim"));
+    }
+    let base = ArrayView2::from_shape((base.len() / dim, dim), base)
+        .map_err(|e| JsError::new(&e.to_string()))?;
+    let eval = ArrayView2::from_shape((eval.len() / dim, dim), eval)
+        .map_err(|e| JsError::new(&e.to_string()))?;
+
+    let report = |done: usize, total: usize| {
+        if let Some(f) = &on_progress {
+            // A throwing callback must not abort the search; ignore its result.
+            let _ = f.call2(
+                &JsValue::NULL,
+                &JsValue::from_f64(done as f64),
+                &JsValue::from_f64(total as f64),
+            );
+        }
+    };
+
+    let pools = vqb::candidates::top_neighbors_with_progress(eval, base, l, report);
+    // Flat, because a Vec<Vec<_>> would cross the boundary as nested JS arrays.
+    Ok(pools
+        .into_iter()
+        .flat_map(|row| row.into_iter().map(|i| i as u32))
+        .collect())
 }
 
 /// Run a config against vectors parsed in JS.
