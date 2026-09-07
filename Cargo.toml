@@ -1,3 +1,6 @@
+[workspace]
+members = ["crates/vqb-wasm"]
+
 [package]
 name = "vqb"
 version = "0.1.0"
@@ -31,3 +34,9 @@ hdf5-sys = { package = "hdf5-metno-sys", version = "0.12", optional = true }
 [features]
 default = ["hdf5"]
 hdf5 = ["dep:hdf5", "dep:hdf5-sys"]
+
+# Set at the workspace root so the wasm build picks it up: small, fast modules.
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1

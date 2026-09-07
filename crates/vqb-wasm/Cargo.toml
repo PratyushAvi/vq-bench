@@ -1,0 +1,31 @@
+[package]
+name = "vqb-wasm"
+version = "0.1.0"
+edition = "2021"
+description = "WebAssembly bindings for vq-bench: run quantizers in the browser."
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# default-features = false drops hdf5/hdf5-sys (a native C library that cannot
+# build for wasm). The CLI-only deps (clap) live on the bin target, so a library
+# dependency never pulls them in.
+vqb = { path = "../..", default-features = false }
+
+anyhow = "1"
+ndarray = "0.16"
+rand = "0.10"
+rand_chacha = "0.10"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+wasm-bindgen = "0.2"
+
+# Three getrandom majors reach us transitively -- 0.2 via linfa, 0.3 via faer,
+# 0.4 via rand 0.10 -- and each needs its browser backend switched on by hand or
+# it refuses to compile for wasm32-unknown-unknown. 0.3/0.4 additionally need
+# --cfg getrandom_backend="wasm_js" (set in .cargo/config.toml).
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom_02 = { package = "getrandom", version = "0.2", features = ["js"] }
+getrandom_03 = { package = "getrandom", version = "0.3", features = ["wasm_js"] }
+getrandom_04 = { package = "getrandom", version = "0.4", features = ["wasm_js"] }
