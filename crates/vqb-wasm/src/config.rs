@@ -60,11 +60,36 @@ pub struct MethodConfig {
 }
 
 /// One stage of a custom pipeline: a primitive key plus its params.
-#[derive(Debug, Deserialize)]
+///
+/// As with a family's params, an array value is a sweep: a chain carrying
+/// `{"name": "cast_uint", "b": [2, 4]}` is two pipelines.
+#[derive(Debug, Deserialize, Clone)]
 pub struct StageConfig {
     pub name: String,
     #[serde(flatten)]
     pub params: BTreeMap<String, Value>,
+}
+
+/// Every combination of one stage's array-valued params, as concrete stages.
+fn expand_stage(stage: &StageConfig) -> Vec<StageConfig> {
+    let mut combos = vec![StageConfig { name: stage.name.clone(), params: BTreeMap::new() }];
+    for (key, value) in &stage.params {
+        let choices: Vec<Value> = match value {
+            Value::Array(items) => items.clone(),
+            scalar => vec![scalar.clone()],
+        };
+        combos = combos
+            .iter()
+            .flat_map(|base| {
+                choices.iter().map(move |choice| {
+                    let mut next = base.clone();
+                    next.params.insert(key.clone(), choice.clone());
+                    next
+                })
+            })
+            .collect();
+    }
+    combos
 }
 
 fn default_ks() -> Vec<usize> {
@@ -105,12 +130,39 @@ impl MethodConfig {
         combos
     }
 
+    /// Expand a custom pipeline's stage sweeps into concrete stage lists.
+    ///
+    /// `expand` covers a family's own params, but a composed pipeline carries
+    /// its params on the stages instead -- so without this, `b: [2, 4]` on a
+    /// stage reached the primitive registry as an array and was rejected. The
+    /// two are the same idea and should behave the same way.
+    ///
+    /// Returns one entry per combination across all stages, in stage order.
+    pub fn expand_stages(&self) -> Vec<Vec<StageConfig>> {
+        let Some(stages) = &self.stages else {
+            return Vec::new();
+        };
+        let mut chains: Vec<Vec<StageConfig>> = vec![Vec::new()];
+        for stage in stages {
+            let options = expand_stage(stage);
+            chains = chains
+                .iter()
+                .flat_map(|base| {
+                    options.iter().map(move |option| {
+                        let mut next = base.clone();
+                        next.push(option.clone());
+                        next
+                    })
+                })
+                .collect();
+        }
+        chains
+    }
+
     /// A human-readable label for one expanded param set: `MinMax (b=4)`.
     pub fn label(&self, params: &vqb::Params) -> String {
         if let Some(stages) = &self.stages {
-            // A composed pipeline has no family name, so name it by its shape.
-            let chain: Vec<&str> = stages.iter().map(|s| s.name.as_str()).collect();
-            return format!("{} [{}]", self.name, chain.join(" -> "));
+            return self.label_for(stages);
         }
         let family = vqb::catalog::display(&self.name);
         if params.is_empty() {
@@ -121,5 +173,44 @@ impl MethodConfig {
             .map(|(k, v)| format!("{k}={v}"))
             .collect();
         format!("{family} ({})", rendered.join(", "))
+    }
+
+    /// Name one expanded chain by its shape, and by whichever params differ
+    /// across the sweep -- otherwise every run of a swept pipeline would carry
+    /// the same label and the results could not be told apart.
+    pub fn label_for(&self, chain: &[StageConfig]) -> String {
+        let swept = self.swept_params();
+        let shape: Vec<String> = chain
+            .iter()
+            .map(|stage| {
+                let shown: Vec<String> = stage
+                    .params
+                    .iter()
+                    .filter(|(key, _)| swept.contains(&(stage.name.clone(), (*key).clone())))
+                    .map(|(key, value)| format!("{key}={value}"))
+                    .collect();
+                if shown.is_empty() {
+                    stage.name.clone()
+                } else {
+                    format!("{}({})", stage.name, shown.join(", "))
+                }
+            })
+            .collect();
+        format!("{} [{}]", self.name, shape.join(" -> "))
+    }
+
+    /// The (stage, param) pairs this method sweeps over, so a label mentions
+    /// only what actually varies rather than repeating every fixed value.
+    fn swept_params(&self) -> Vec<(String, String)> {
+        self.stages
+            .iter()
+            .flatten()
+            .flat_map(|stage| {
+                stage.params.iter().filter_map(move |(key, value)| {
+                    matches!(value, Value::Array(items) if items.len() > 1)
+                        .then(|| (stage.name.clone(), key.clone()))
+                })
+            })
+            .collect()
     }
 }

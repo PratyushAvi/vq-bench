@@ -14,8 +14,18 @@ use vqb::{AsQuantizer, Params, Pipeline, Quantizer};
 use crate::config::MethodConfig;
 
 /// Build the quantizer a method config describes, over input dim `dim`.
-pub fn build(method: &MethodConfig, params: &Params, seed: u64, dim: usize) -> Result<Box<dyn Quantizer>> {
-    match &method.stages {
+///
+/// `chain` is the already-expanded stage list for a custom pipeline -- stage
+/// params sweep like a family's do, so the caller picks one combination and
+/// passes it here rather than this reading `method.stages` itself.
+pub fn build(
+    method: &MethodConfig,
+    params: &Params,
+    chain: Option<&[crate::config::StageConfig]>,
+    seed: u64,
+    dim: usize,
+) -> Result<Box<dyn Quantizer>> {
+    match chain {
         None => vqb::catalog::build(&method.name, params, seed, dim),
         Some(stages) => {
             if !params.is_empty() {

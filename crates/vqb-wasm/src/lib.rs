@@ -113,6 +113,9 @@ pub fn validate_config(config_json: &str, dim: usize) -> String {
             errors.push(format!("unknown quantizer: {}", method.name));
             continue;
         }
+        // A custom pipeline sweeps on its stages; a family on its own params.
+        // Either way each combination is checked separately.
+        let chains = method.expand_stages();
         for params in method.expand() {
             // Names the family does not accept. A bad name also makes `build`
             // fail, so reporting that too would say the same thing twice.
@@ -128,10 +131,19 @@ pub fn validate_config(config_json: &str, dim: usize) -> String {
                 continue;
             }
             // Values it rejects -- only checkable by building it.
-            if dim > 0 {
-                if let Err(err) = pipeline::build(method, &params, config.seed, dim) {
-                    errors.push(format!("{}: {}", method.label(&params), full_chain(&err)));
+            if dim == 0 {
+                continue;
+            }
+            if custom {
+                for chain in &chains {
+                    if let Err(err) =
+                        pipeline::build(method, &params, Some(chain), config.seed, dim)
+                    {
+                        errors.push(format!("{}: {}", method.label_for(chain), full_chain(&err)));
+                    }
                 }
+            } else if let Err(err) = pipeline::build(method, &params, None, config.seed, dim) {
+                errors.push(format!("{}: {}", method.label(&params), full_chain(&err)));
             }
         }
     }
@@ -225,20 +237,34 @@ fn try_run(
     let mut results = Vec::new();
 
     for method in &config.methods {
+        // A custom pipeline sweeps on its stages, a family on its own params.
+        // `None` here means "not a custom pipeline", which is what selects the
+        // family path in `pipeline::build`.
+        let chains: Vec<Option<Vec<_>>> = if method.stages.is_some() {
+            method.expand_stages().into_iter().map(Some).collect()
+        } else {
+            vec![None]
+        };
         for params in method.expand() {
-            let quantizer = pipeline::build(method, &params, config.seed, dim)
-                .map_err(|e| format!("{}: {}", method.name, full_chain(&e)))?;
-            let mut result = evaluate(
-                quantizer.as_ref(),
-                &data,
-                &config.ks,
-                &config.temperatures,
-                config.seed,
-                n_reconstruct,
-                &config.metrics,
-            );
-            result.label = method.label(&params);
-            results.push(result);
+            for chain in &chains {
+                let quantizer =
+                    pipeline::build(method, &params, chain.as_deref(), config.seed, dim)
+                        .map_err(|e| format!("{}: {}", method.name, full_chain(&e)))?;
+                let mut result = evaluate(
+                    quantizer.as_ref(),
+                    &data,
+                    &config.ks,
+                    &config.temperatures,
+                    config.seed,
+                    n_reconstruct,
+                    &config.metrics,
+                );
+                result.label = match chain {
+                    Some(stages) => method.label_for(stages),
+                    None => method.label(&params),
+                };
+                results.push(result);
+            }
         }
     }
 
