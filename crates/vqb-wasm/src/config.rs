@@ -63,16 +63,29 @@ pub struct MethodConfig {
 ///
 /// As with a family's params, an array value is a sweep: a chain carrying
 /// `{"name": "cast_uint", "b": [2, 4]}` is two pipelines.
+///
+/// A splitter (`segment_split`) also carries `branch`, the chain every branch
+/// runs; it sweeps like any other stage list.
 #[derive(Debug, Deserialize, Clone)]
 pub struct StageConfig {
     pub name: String,
+    #[serde(default)]
+    pub branch: Option<Vec<StageConfig>>,
     #[serde(flatten)]
     pub params: BTreeMap<String, Value>,
 }
 
-/// Every combination of one stage's array-valued params, as concrete stages.
+/// Every combination of one stage's array-valued params (and, for a splitter,
+/// of its branch chain), as concrete stages.
 fn expand_stage(stage: &StageConfig) -> Vec<StageConfig> {
-    let mut combos = vec![StageConfig { name: stage.name.clone(), params: BTreeMap::new() }];
+    let branches: Vec<Option<Vec<StageConfig>>> = match &stage.branch {
+        Some(chain) => expand_chain(chain).into_iter().map(Some).collect(),
+        None => vec![None],
+    };
+    let mut combos: Vec<StageConfig> = branches
+        .into_iter()
+        .map(|branch| StageConfig { name: stage.name.clone(), branch, params: BTreeMap::new() })
+        .collect();
     for (key, value) in &stage.params {
         let choices: Vec<Value> = match value {
             Value::Array(items) => items.clone(),
@@ -90,6 +103,50 @@ fn expand_stage(stage: &StageConfig) -> Vec<StageConfig> {
             .collect();
     }
     combos
+}
+
+/// Every combination across a stage list's sweeps, in stage order.
+fn expand_chain(stages: &[StageConfig]) -> Vec<Vec<StageConfig>> {
+    let mut chains: Vec<Vec<StageConfig>> = vec![Vec::new()];
+    for stage in stages {
+        let options = expand_stage(stage);
+        chains = chains
+            .iter()
+            .flat_map(|base| {
+                options.iter().map(move |option| {
+                    let mut next = base.clone();
+                    next.push(option.clone());
+                    next
+                })
+            })
+            .collect();
+    }
+    chains
+}
+
+/// The (stage, param) pairs a stage list sweeps over, branches included.
+fn collect_swept(stages: &[StageConfig], out: &mut Vec<(String, String)>) {
+    for stage in stages {
+        for (key, value) in &stage.params {
+            if matches!(value, Value::Array(items) if items.len() > 1) {
+                out.push((stage.name.clone(), key.clone()));
+            }
+        }
+        if let Some(branch) = &stage.branch {
+            collect_swept(branch, out);
+        }
+    }
+}
+
+/// The largest `centroids` value in a stage list, branches included.
+pub fn max_centroids(stages: &[StageConfig]) -> Option<usize> {
+    stages
+        .iter()
+        .flat_map(|stage| {
+            let own = stage.params.get("centroids").and_then(Value::as_u64).map(|c| c as usize);
+            own.into_iter().chain(stage.branch.as_deref().and_then(max_centroids))
+        })
+        .max()
 }
 
 fn default_ks() -> Vec<usize> {
@@ -139,24 +196,10 @@ impl MethodConfig {
     ///
     /// Returns one entry per combination across all stages, in stage order.
     pub fn expand_stages(&self) -> Vec<Vec<StageConfig>> {
-        let Some(stages) = &self.stages else {
-            return Vec::new();
-        };
-        let mut chains: Vec<Vec<StageConfig>> = vec![Vec::new()];
-        for stage in stages {
-            let options = expand_stage(stage);
-            chains = chains
-                .iter()
-                .flat_map(|base| {
-                    options.iter().map(move |option| {
-                        let mut next = base.clone();
-                        next.push(option.clone());
-                        next
-                    })
-                })
-                .collect();
+        match &self.stages {
+            Some(stages) => expand_chain(stages),
+            None => Vec::new(),
         }
-        chains
     }
 
     /// A human-readable label for one expanded param set: `MinMax (b=4)`.
@@ -180,37 +223,39 @@ impl MethodConfig {
     /// the same label and the results could not be told apart.
     pub fn label_for(&self, chain: &[StageConfig]) -> String {
         let swept = self.swept_params();
-        let shape: Vec<String> = chain
-            .iter()
-            .map(|stage| {
-                let shown: Vec<String> = stage
-                    .params
-                    .iter()
-                    .filter(|(key, _)| swept.contains(&(stage.name.clone(), (*key).clone())))
-                    .map(|(key, value)| format!("{key}={value}"))
-                    .collect();
-                if shown.is_empty() {
-                    stage.name.clone()
-                } else {
-                    format!("{}({})", stage.name, shown.join(", "))
-                }
-            })
-            .collect();
-        format!("{} [{}]", self.name, shape.join(" -> "))
+        format!("{} [{}]", self.name, shape_of(chain, &swept))
     }
 
     /// The (stage, param) pairs this method sweeps over, so a label mentions
     /// only what actually varies rather than repeating every fixed value.
     fn swept_params(&self) -> Vec<(String, String)> {
-        self.stages
-            .iter()
-            .flatten()
-            .flat_map(|stage| {
-                stage.params.iter().filter_map(move |(key, value)| {
-                    matches!(value, Value::Array(items) if items.len() > 1)
-                        .then(|| (stage.name.clone(), key.clone()))
-                })
-            })
-            .collect()
+        let mut out = Vec::new();
+        collect_swept(self.stages.as_deref().unwrap_or_default(), &mut out);
+        out
     }
+}
+
+/// `a -> b(k=v) -> split[c -> d]`: a chain's shape, with a splitter's branch
+/// chain nested in brackets.
+fn shape_of(chain: &[StageConfig], swept: &[(String, String)]) -> String {
+    let parts: Vec<String> = chain
+        .iter()
+        .map(|stage| {
+            let shown: Vec<String> = stage
+                .params
+                .iter()
+                .filter(|(key, _)| swept.contains(&(stage.name.clone(), (*key).clone())))
+                .map(|(key, value)| format!("{key}={value}"))
+                .collect();
+            let mut text = stage.name.clone();
+            if !shown.is_empty() {
+                text = format!("{text}({})", shown.join(", "));
+            }
+            if let Some(branch) = &stage.branch {
+                text = format!("{text}[{}]", shape_of(branch, swept));
+            }
+            text
+        })
+        .collect();
+    parts.join(" -> ")
 }

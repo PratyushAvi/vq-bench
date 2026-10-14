@@ -11,8 +11,8 @@ export function list_metrics(): string;
  * a one-line description.
  *
  * Read from the registry, so a primitive added upstream appears in the builder
- * without a change here. Splitters are absent: they fan out into branch
- * pipelines, which a linear chain cannot express.
+ * without a change here. Splitters follow the linear stages, marked
+ * `"splitter": true`: they carry a `branch` chain rather than just params.
  */
 export function list_primitives(): string;
 

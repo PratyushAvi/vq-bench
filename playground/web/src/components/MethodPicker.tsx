@@ -25,7 +25,15 @@ type Props = {
   onExpand: (key: string | null) => void;
   onParamChange: (key: string, param: string, value: string) => void;
   onDeleteSaved: (name: string) => void;
+  onEditSaved: (name: string) => void;
 };
+
+/** `a → split[b → c]`: a saved chain's shape, branches nested. */
+function describeStages(stages: SavedQuantizer["stages"]): string {
+  return stages
+    .map((s) => (s.branch ? `${s.name}[${describeStages(s.branch as SavedQuantizer["stages"])}]` : s.name))
+    .join(" → ");
+}
 
 export function MethodPicker({
   quantizers,
@@ -39,6 +47,7 @@ export function MethodPicker({
   onExpand,
   onParamChange,
   onDeleteSaved,
+  onEditSaved,
 }: Props) {
   return (
     <div className="space-y-3">
@@ -60,9 +69,16 @@ export function MethodPicker({
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-xs font-medium text-slate-800 dark:text-slate-200">{pipeline.name}</p>
                   <p className="truncate font-mono text-xs text-slate-500 dark:text-slate-400">
-                    {pipeline.stages.map((s) => s.name).join(" → ")}
+                    {describeStages(pipeline.stages)}
                   </p>
                 </div>
+                <button
+                  onClick={() => onEditSaved(pipeline.name)}
+                  aria-label={`edit ${pipeline.name}`}
+                  className="px-1 text-xs text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
+                >
+                  edit
+                </button>
                 <button
                   onClick={() => onDeleteSaved(pipeline.name)}
                   aria-label={`delete ${pipeline.name}`}

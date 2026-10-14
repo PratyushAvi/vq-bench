@@ -8,7 +8,8 @@
 // builds it through vq-bench and reports that crate's own errors.
 
 import type { PrimitiveSpec, Stage } from "../lib/types";
-import { defaultValue, shapeOf } from "../lib/params";
+import { shapeOf } from "../lib/params";
+import { newStage } from "../lib/stages";
 
 type Props = {
   primitives: PrimitiveSpec[];
@@ -16,29 +17,31 @@ type Props = {
   onChange: (stages: Stage[]) => void;
 };
 
-let nextId = 1;
-
 /** Rounders are what actually quantize; a chain without one only conditions. */
 const ROUNDERS = /^(cast_|kmeans$)/;
 
+/** A splitter counts when its branch chain does. */
 function endsInRounder(stages: Stage[]): boolean {
-  return stages.some((s) => ROUNDERS.test(s.key));
+  return stages.some((s) => (s.branch ? endsInRounder(s.branch) : ROUNDERS.test(s.key)));
 }
 
 export function PipelineBuilder({ primitives, stages, onChange }: Props) {
+  return <StageList primitives={primitives} stages={stages} onChange={onChange} nested={false} />;
+}
+
+/** One chain of stages; a splitter stage renders another inside itself. */
+function StageList({
+  primitives,
+  stages,
+  onChange,
+  nested,
+}: Props & { nested: boolean }) {
   const specOf = (key: string) => primitives.find((p) => p.key === key);
 
   function addStage(key: string) {
     const spec = specOf(key);
     if (!spec) return;
-    onChange([
-      ...stages,
-      {
-        id: nextId++,
-        key,
-        params: Object.fromEntries(spec.params.map((p) => [p, defaultValue(p)])),
-      },
-    ]);
+    onChange([...stages, newStage(spec)]);
   }
 
   function update(id: number, change: Partial<Stage>) {
@@ -55,7 +58,12 @@ export function PipelineBuilder({ primitives, stages, onChange }: Props) {
 
   return (
     <div className="space-y-3">
-      {stages.length === 0 && (
+      {stages.length === 0 && nested && (
+        <p className="text-xs text-slate-500 dark:text-slate-400">
+          Empty branch. Add the stages each segment runs through.
+        </p>
+      )}
+      {stages.length === 0 && !nested && (
         <p className="text-xs text-slate-500 dark:text-slate-400">
           An empty pipeline. Add a stage below — a chain usually ends in a rounder
           (<span className="font-mono">cast_*</span> or <span className="font-mono">kmeans</span>),
@@ -74,11 +82,12 @@ export function PipelineBuilder({ primitives, stages, onChange }: Props) {
                   value={stage.key}
                   onChange={(e) => {
                     const spec = specOf(e.target.value);
+                    const fresh = spec ? newStage(spec) : undefined;
                     update(stage.id, {
                       key: e.target.value,
-                      params: Object.fromEntries(
-                        (spec?.params ?? []).map((p) => [p, defaultValue(p)]),
-                      ),
+                      params: fresh?.params ?? {},
+                      // Keep a splitter's branch across a switch to another splitter.
+                      branch: fresh?.branch && (stage.branch ?? fresh.branch),
                     });
                   }}
                   className="min-w-0 flex-1 rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-2 py-1 text-xs focus:border-slate-500 focus:outline-none"
@@ -162,6 +171,20 @@ export function PipelineBuilder({ primitives, stages, onChange }: Props) {
                       </label>
                     );
                   })}
+                </div>
+              )}
+
+              {stage.branch && (
+                <div className="mt-2 ml-6 border-l-2 border-slate-200 dark:border-slate-700 pl-3">
+                  <p className="mb-1.5 text-xs font-medium text-slate-500 dark:text-slate-400">
+                    runs on each branch
+                  </p>
+                  <StageList
+                    primitives={primitives}
+                    stages={stage.branch}
+                    onChange={(branch) => update(stage.id, { branch })}
+                    nested
+                  />
                 </div>
               )}
             </li>

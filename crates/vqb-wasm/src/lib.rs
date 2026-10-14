@@ -42,11 +42,11 @@ pub fn list_quantizers() -> String {
 /// a one-line description.
 ///
 /// Read from the registry, so a primitive added upstream appears in the builder
-/// without a change here. Splitters are absent: they fan out into branch
-/// pipelines, which a linear chain cannot express.
+/// without a change here. Splitters follow the linear stages, marked
+/// `"splitter": true`: they carry a `branch` chain rather than just params.
 #[wasm_bindgen]
 pub fn list_primitives() -> String {
-    let primitives: Vec<Value> = vqb::primitive_registry::primitives()
+    let mut primitives: Vec<Value> = vqb::primitive_registry::primitives()
         .into_iter()
         .map(|p| {
             json!({
@@ -57,6 +57,15 @@ pub fn list_primitives() -> String {
             })
         })
         .collect();
+    primitives.extend(vqb::primitive_registry::splitters().into_iter().map(|s| {
+        json!({
+            "key": s.key,
+            "display": s.display,
+            "params": s.params,
+            "describe": s.describe,
+            "splitter": true,
+        })
+    }));
     to_json(&Value::Array(primitives))
 }
 
@@ -247,6 +256,19 @@ fn try_run(
         };
         for params in method.expand() {
             for chain in &chains {
+                // A codebook larger than the training set panics inside k-means, and
+                // a wasm panic cannot be caught, so refuse it here with a message.
+                let centroids = match chain {
+                    Some(stages) => config::max_centroids(stages),
+                    None => params.get("centroids").and_then(Value::as_u64).map(|c| c as usize),
+                };
+                if let Some(c) = centroids.filter(|&c| c > data.base.nrows()) {
+                    return Err(format!(
+                        "{}: centroids={c} exceeds the {} base rows used to fit; lower centroids or raise n_base",
+                        method.name,
+                        data.base.nrows()
+                    ));
+                }
                 let quantizer =
                     pipeline::build(method, &params, chain.as_deref(), config.seed, dim)
                         .map_err(|e| format!("{}: {}", method.name, full_chain(&e)))?;

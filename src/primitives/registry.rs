@@ -6,10 +6,9 @@
 //! reads them, mirroring `QuantizerSpec` for quantizer families — so a caller
 //! composing a custom pipeline gets the same errors a built-in family would.
 //!
-//! Only linear stages ([`Primitive`]) appear here. Splitters fan out into
-//! branch pipelines, a tree rather than a chain, which a linear
-//! [`Pipeline`](crate::Pipeline) cannot express; PQ and OPQ remain available as
-//! whole families.
+//! [`primitives`] lists the linear stages ([`Primitive`]). Splitters fan out
+//! into branch pipelines, so they are listed separately by [`splitters`] and
+//! built by [`build_split`], which takes the branch pipelines as a factory.
 
 use anyhow::{anyhow, bail, Result};
 use serde_json::Value;
@@ -18,7 +17,8 @@ use crate::quantizers::catalog::{get, get_or};
 use crate::{
     AbsMax, BalanceParts, CastAngular, CastHamming, CastNormal, CastSign, CastUint, Center,
     Kmeans, MinMax, MinMaxDim, Normalize, NormalScale, OptimizePq, OptimizeSigns, Params,
-    PcaRotate, Primitive, RandomHadamard, RandomRotate, Resize, Scale,
+    PcaRotate, Pipeline, Primitive, RandomHadamard, RandomRotate, Resize, Scale, SegmentSplit,
+    Split, Splitter,
 };
 
 /// One buildable stage: its config key, the params it accepts, and how to make
@@ -234,3 +234,92 @@ pub fn param_names(key: &str) -> Option<&'static [&'static str]> {
     lookup(key).map(|s| s.params)
 }
 
+
+/// One buildable splitter: its config key and the params it accepts. The branch
+/// pipelines are not a param -- the caller supplies them to [`build_split`].
+#[derive(Clone, Copy)]
+pub struct SplitterSpec {
+    pub key: &'static str,
+    pub display: &'static str,
+    pub params: &'static [&'static str],
+    pub describe: &'static str,
+}
+
+/// Every splitter that can head a fan-out stage in a custom pipeline.
+pub fn splitters() -> Vec<SplitterSpec> {
+    vec![SplitterSpec {
+        key: "segment_split",
+        display: <SegmentSplit as Splitter>::name(),
+        params: &["section_dim"],
+        describe: <SegmentSplit as Splitter>::describe(),
+    }]
+}
+
+/// Build a fan-out stage: splitter `key` over input dim `dim`, with
+/// `branch(i, branch_dim)` giving branch `i`'s child pipeline.
+///
+/// `branch` is called lazily at fit time, so it cannot report an error then;
+/// call [`split_branch_dims`] first and check the branches it names.
+pub fn build_split<F>(
+    key: &str,
+    params: &Params,
+    dim: usize,
+    branch: F,
+) -> Result<Box<dyn Primitive>>
+where
+    F: Fn(usize, usize) -> Pipeline + Send + Sync + 'static,
+{
+    match key {
+        "segment_split" => {
+            let section_dim = segment_section_dim(params, dim)?;
+            Ok(Box::new(Split::from_factory(SegmentSplit::new(dim, section_dim), branch)))
+        }
+        other => bail!("unknown splitter `{other}`"),
+    }
+}
+
+/// The distinct branch widths splitter `key` yields over `dim` (segment splits give
+/// `section_dim`, plus a shorter last one when it does not divide `dim`), so a caller
+/// can validate a branch pipeline for each before building.
+pub fn split_branch_dims(key: &str, params: &Params, dim: usize) -> Result<Vec<usize>> {
+    match key {
+        "segment_split" => {
+            let section_dim = segment_section_dim(params, dim)?;
+            let mut dims = vec![section_dim.min(dim)];
+            if !dim.is_multiple_of(section_dim) {
+                dims.push(dim % section_dim);
+            }
+            Ok(dims)
+        }
+        other => bail!("unknown splitter `{other}`"),
+    }
+}
+
+fn segment_section_dim(p: &Params, dim: usize) -> Result<usize> {
+    let section_dim: usize = get(p, "section_dim")?;
+    if !(1..=dim).contains(&section_dim) {
+        bail!("section_dim must be in 1..={dim}, got {section_dim}");
+    }
+    Ok(section_dim)
+}
+
+/// Look up a splitter by its config key.
+pub fn splitter_lookup(key: &str) -> Option<SplitterSpec> {
+    splitters().into_iter().find(|s| s.key == key)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::util::testing::params;
+    use serde_json::json;
+
+    #[test]
+    fn segment_branch_dims_include_the_ragged_tail() {
+        let p = params(&[("section_dim", json!(4))]);
+        assert_eq!(split_branch_dims("segment_split", &p, 8).unwrap(), vec![4]);
+        assert_eq!(split_branch_dims("segment_split", &p, 10).unwrap(), vec![4, 2]);
+        assert!(split_branch_dims("segment_split", &params(&[("section_dim", json!(9))]), 8).is_err());
+        assert!(split_branch_dims("nope", &p, 8).is_err());
+    }
+}

@@ -15,6 +15,8 @@ export type PrimitiveSpec = {
   display: string;
   params: string[];
   describe: string;
+  /** A fan-out stage: carries a `branch` chain that runs on every branch. */
+  splitter?: boolean;
 };
 
 /** One stage in a pipeline under construction. Values are the raw input text. */
@@ -23,6 +25,8 @@ export type Stage = {
   id: number;
   key: string;
   params: Record<string, string>;
+  /** A splitter's per-branch chain; absent on every other stage. */
+  branch?: Stage[];
 };
 
 /** One metric, as reported by `list_metrics()`. */

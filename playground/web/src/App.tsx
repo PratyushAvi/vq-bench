@@ -43,6 +43,7 @@ import { defaultValue, toConfigValue } from "./lib/params";
 import { runner } from "./lib/runner";
 import { withLoader } from "./lib/loader-pool";
 import type { MethodResult, PrimitiveSpec, Quantizer, Stage } from "./lib/types";
+import { fromConfigStages, toConfigStages } from "./lib/stages";
 
 const DEFAULT_METRICS = ["recall", "mse_score", "mse_recon"];
 const DEFAULT_KS = [1, 10];
@@ -118,6 +119,8 @@ function Playground() {
   const [primitives, setPrimitives] = useState<PrimitiveSpec[]>([]);
   const [mode, setMode] = useState<"family" | "custom">("family");
   const [stages, setStages] = useState<Stage[]>([]);
+  /** The saved pipeline loaded into the builder, if any; saving under its name replaces it. */
+  const [editing, setEditing] = useState<string | null>(null);
   // Several methods can run together, so the selection is a set. Params are
   // held per family, since each keeps its own even while another is expanded.
   const [selectedFamilies, setSelectedFamilies] = useState<string[]>(["minmax"]);
@@ -219,18 +222,7 @@ function Playground() {
   }, [quantizers]);
 
   /** The stage list a composed pipeline describes, in config shape. */
-  const composedStages = useMemo(
-    () =>
-      stages.map((stage) => {
-        const out: { name: string; [param: string]: unknown } = { name: stage.key };
-        for (const [param, raw] of Object.entries(stage.params)) {
-          const value = toConfigValue(param, raw);
-          if (value !== undefined) out[param] = value;
-        }
-        return out;
-      }),
-    [stages],
-  );
+  const composedStages = useMemo(() => toConfigStages(stages), [stages]);
 
   /**
    * The config the form describes: one method per selected quantizer. In
@@ -384,10 +376,29 @@ function Playground() {
       setSaved(await listSavedQuantizers());
       // Selecting it and returning to the list is the obvious next step.
       setSelectedSaved((prev) => (prev.includes(trimmed) ? prev : [...prev, trimmed]));
+      setEditing(null);
+      setStages([]);
       setMode("family");
     },
     [composedStages],
   );
+
+  /** Load a saved pipeline into the builder to change it. */
+  const onEditSaved = useCallback(
+    (name: string) => {
+      const target = saved.find((q) => q.name === name);
+      if (!target) return;
+      setStages(fromConfigStages(target.stages));
+      setEditing(name);
+      setMode("custom");
+    },
+    [saved],
+  );
+
+  const onCancelEdit = useCallback(() => {
+    setEditing(null);
+    setStages([]);
+  }, []);
 
   const onDeleteSaved = useCallback(async (name: string) => {
     await deleteQuantizer(name);
@@ -610,14 +621,20 @@ function Playground() {
                     }))
                   }
                   onDeleteSaved={onDeleteSaved}
+                  onEditSaved={onEditSaved}
                 />
               </>
             ) : (
               <>
                 <PipelineBuilder primitives={primitives} stages={stages} onChange={setStages} />
                 <SavePipeline
+                  // Remount on a new target so the name field starts from it.
+                  key={editing ?? ""}
+                  initialName={editing ?? ""}
+                  editing={editing !== null}
                   disabled={composedStages.length === 0}
                   onSave={onSavePipeline}
+                  onCancel={onCancelEdit}
                 />
               </>
             )}
@@ -799,13 +816,20 @@ function dedupeByLabel(rows: MethodResult[]): MethodResult[] {
 
 /** Naming a composed pipeline so it can be run again later. */
 function SavePipeline({
+  initialName,
+  editing,
   disabled,
   onSave,
+  onCancel,
 }: {
+  initialName: string;
+  editing: boolean;
   disabled: boolean;
   onSave: (name: string) => void;
+  onCancel: () => void;
 }) {
-  const [name, setName] = useState("");
+  const [name, setName] = useState(initialName);
+  const replaces = editing && name.trim() === initialName;
   return (
     <form
       onSubmit={(e) => {
@@ -820,6 +844,7 @@ function SavePipeline({
         onChange={(e) => setName(e.target.value)}
         placeholder="name this pipeline"
         aria-label="pipeline name"
+        title={editing ? "keep the name to replace it, or change it to save a copy" : undefined}
         className="min-w-0 flex-1 rounded-md border border-slate-300 dark:border-slate-600 px-2 py-1.5 text-xs focus:border-slate-500 focus:ring-1 focus:ring-slate-500 focus:outline-none"
       />
       <button
@@ -827,8 +852,17 @@ function SavePipeline({
         disabled={disabled || name.trim() === ""}
         className="rounded-md border border-slate-300 dark:border-slate-600 px-3 py-1.5 text-xs text-slate-700 dark:text-slate-300 hover:border-slate-500 dark:hover:border-slate-400 dark:hover:border-slate-500 hover:text-slate-900 dark:hover:text-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
       >
-        save
+        {replaces ? "update" : "save"}
       </button>
+      {editing && (
+        <button
+          type="button"
+          onClick={onCancel}
+          className="rounded-md px-2 py-1.5 text-xs text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
+        >
+          cancel
+        </button>
+      )}
     </form>
   );
 }
