@@ -1,0 +1,55 @@
+{
+ "base_url": "https://huggingface.co/datasets/vector-index-bench/vibe/resolve/main",
+ "datasets": [
+  {
+   "name": "arxiv-nomic-768-normalized",
+   "dim": 768,
+   "n_base": 1344643
+  },
+  {
+   "name": "coco-nomic-768-normalized",
+   "dim": 768,
+   "n_base": 282360
+  },
+  {
+   "name": "ccnews-nomic-768-normalized",
+   "dim": 768,
+   "n_base": 495328
+  },
+  {
+   "name": "yahoo-minilm-384-normalized",
+   "dim": 384,
+   "n_base": 677305
+  },
+  {
+   "name": "laion-clip-512-normalized",
+   "dim": 512,
+   "n_base": 1000448
+  },
+  {
+   "name": "landmark-nomic-768-normalized",
+   "dim": 768,
+   "n_base": 760757
+  },
+  {
+   "name": "imagenet-clip-512-normalized",
+   "dim": 512,
+   "n_base": 1281167
+  },
+  {
+   "name": "llama-128-ip",
+   "dim": 128,
+   "n_base": 256921
+  },
+  {
+   "name": "msmarco-qwen-1024-normalized",
+   "dim": 1024,
+   "n_base": 8840823
+  },
+  {
+   "name": "hotpotqa-harrier-640-normalized",
+   "dim": 640,
+   "n_base": 5233329
+  }
+ ]
+}

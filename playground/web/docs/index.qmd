@@ -1,0 +1,52 @@
+---
+title: "What are Vector Quantizers"
+# The format lives in _quarto.yml. A `format:` block here replaces the
+# project's rather than merging with it, which silently dropped `toc: true`
+# and left the guide with no contents list. Fonts and styling come from the
+# app, which renders this page -- nothing here needs its own <head>.
+---
+
+::: {.coming-soon}
+Coming soon...
+:::
+
+<!-- ::: {.callout-note}
+This page is a placeholder. The sections below sketch the intended shape of the
+argument; none of the text is final.
+:::
+
+## Why quantize at all
+
+Placeholder. This section will motivate the problem: embeddings are stored by
+the million, a float32 vector costs four bytes per dimension, and at scale that
+cost dominates everything else about a retrieval system.
+
+## The rate/quality tradeoff
+
+Placeholder. Every quantizer spends a bit budget and gives back some accuracy.
+This section will introduce the curve the playground plots throughout — recall
+against bits per dimension — and explain why a quantizer is only ever
+interesting *relative* to what the same budget buys elsewhere.
+
+## Pipelines of primitives
+
+Placeholder. This section will describe the taxonomy the landing-page diagrams
+use, and work through one composition end to end.
+
+| Group | What it does | Examples |
+|-------|--------------|----------|
+| Conditioner | Reshapes the vectors before rounding | `center`, `normalize`, `rotate` |
+| Rounder | Performs the actual quantization | `cast_angular`, `kmeans` |
+| Splitter | Fans the vector into branches | `segment_split` |
+
+## Measuring the result
+
+Placeholder. This section will cover the metrics the benchmark reports —
+recall@k and reconstruction error — and what each one does and does not tell
+you.
+
+## Where to go next
+
+Placeholder. Closing pointers: open the [playground](#playground), read the
+[vq-bench results](https://www.vq-bench.com), or browse the
+[source](https://github.com/pinecone-io/vq-bench). -->

@@ -1,0 +1,368 @@
+@import "tailwindcss";
+
+/* Dark mode is driven by `data-theme` on <html>, set by the toggle in the nav
+ * and defaulting to the system preference. Tailwind v4 needs the variant
+ * declared, since its default `dark:` follows the media query alone -- which
+ * would ignore an explicit choice. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* Fonts.
+ *
+ * Open Sans from Google, Gambarino and Boska from Fontshare. The @font-face
+ * rules are linked from index.html, not imported here -- the bundler strips an
+ * @import that follows Tailwind's, and does it silently.
+ *
+ * Weights are listed explicitly in the Fontshare URL. The API silently drops
+ * one family when a variable spec (`@1,2`) is combined with a static one, and
+ * the dropped face then falls back to a system serif with no error -- so ask
+ * for the weights you want by number.
+ *
+ * Gambetta ships 300-700; Gambarino a single 400 cut and no bold. */
+@theme {
+  /* The two roles the UI styles against. Change these, not the call sites. */
+  --font-body: "Open Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-heading: "Gambetta", Georgia, "Times New Roman", serif;
+  /* The other imported face, unused by default but ready to swap in. */
+  --font-display-alt: "Gambarino", Georgia, serif;
+  /* The pipeline diagram's boxes -- its own role, so the diagram can be
+     restyled without touching body or heading text. */
+  --font-diagram: "Indie Flower", ui-monospace, SFMono-Regular, monospace;
+
+  /* Primitive groups, coloured as vq-bench groups them: conditioners reshape
+     the vectors, rounders are what actually quantize, splitters fan out. */
+  --stage-conditioner: #2a78d6;
+  --stage-rounder: #eb6834;
+  --stage-splitter: #1baf7a;
+
+  /* Tailwind's own `font-sans` / `font-serif`, so utility classes and the
+     variables cannot drift apart. */
+  --font-sans: var(--font-body);
+  --font-serif: var(--font-heading);
+
+  /* The type scale, raised one step.
+   *
+   * A dense tool tempts you into 12px everywhere, and the page ends up hard to
+   * read -- `text-xs` was carrying most of the UI. Redefining the steps lifts
+   * every call site at once, rather than leaving a mix of sizes behind:
+   * 13px is the floor, and the body sits at 15px.
+   *
+   * Line heights move with them; Tailwind pairs each size with its own. */
+  --text-xs: 0.8125rem;    /* 13px, was 12 */
+  --text-xs--line-height: 1.25rem;
+  --text-sm: 0.9375rem;    /* 15px, was 14 */
+  --text-sm--line-height: 1.5rem;
+  --text-base: 1.0625rem;  /* 17px, was 16 */
+  --text-base--line-height: 1.625rem;
+}
+
+body {
+  font-family: var(--font-body);
+}
+
+/* Anything clickable gets the hand.
+ *
+ * Tailwind v4 dropped the `cursor: pointer` its preflight used to put on
+ * buttons, which left it to be remembered per call site -- and it was missed
+ * on most of them. Stated once here instead: a disabled control keeps the
+ * default arrow, since it does nothing. */
+button:not(:disabled),
+summary,
+select:not(:disabled),
+[role="button"]:not([aria-disabled="true"]),
+label:has(> input[type="checkbox"]:not(:disabled)),
+input[type="checkbox"]:not(:disabled) {
+  cursor: pointer;
+}
+
+/* The page ground. Set here rather than only on the app's root div so the
+   colour is behind the whole viewport, including any overscroll. */
+/* Dark mode's palette.
+ *
+ * Tailwind's slate is a blue-tinted ramp, which reads as navy rather than dark
+ * once it covers whole surfaces. Redefining the ramp itself -- rather than
+ * rewriting every call site -- swaps it for neutral greys anchored on true
+ * black, and lifts the text steps for more contrast against them.
+ *
+ * The scale still runs light-to-dark by number, so `bg-slate-900` and
+ * `text-slate-100` keep meaning what they say; only the hues change. */
+:root[data-theme="dark"] {
+  --color-slate-950: #000000;
+  --color-slate-900: #0a0a0a;
+  --color-slate-800: #1a1a1a;
+  --color-slate-700: #2e2e2e;
+  --color-slate-600: #454545;
+  --color-slate-500: #8a8a8a;
+  --color-slate-400: #a8a8a8;
+  --color-slate-300: #c8c8c8;
+  --color-slate-200: #e0e0e0;
+  --color-slate-100: #f2f2f2;
+  --color-slate-50: #fafafa;
+}
+
+:root[data-theme="dark"] body {
+  background: #000000;
+  color: var(--color-slate-100);
+  color-scheme: dark;
+}
+
+/* One rule under the nav, and no panel borders competing with it: on black a
+   bordered box reads as a floating card, where the content should simply sit
+   on the page. */
+:root[data-theme="dark"] nav {
+  background: #000000;
+  border-bottom: 1px solid var(--color-slate-700);
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-heading);
+  font-weight: 600;
+}
+
+h1 {
+  font-weight: 700;
+}
+
+/* Numerals line up down a column. Gambetta defaults to old-style figures,
+   which drop 4/6/9 below the baseline -- fine in prose, wrong in a table that
+   is read by scanning a column of numbers. */
+table {
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+/* Chart palette.
+ *
+ * Categorical slots in fixed order, so a quantizer family keeps its colour as
+ * the series list changes. Both modes are selected, not flipped: the dark
+ * column is the same hues re-stepped for the dark surface. Validated for
+ * lightness, chroma, CVD separation and contrast in both modes.
+ *
+ * `--series-mine` is reserved for the reader's own result, never used for a
+ * reference curve. */
+.viz-root {
+  --surface-1: #fcfcfb;
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+  --series-5: #e87ba4;
+  --series-6: #4a3aa7;
+  --series-mine: #0b0b0b;
+  /* Earlier runs: present as context, never competing with the subject. */
+  --series-muted: #94a3b8;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) .viz-root {
+    --surface-1: #1a1a19;
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --series-4: #c98500;
+    --series-5: #d55181;
+    --series-6: #9085e9;
+    --series-mine: #ffffff;
+    --series-muted: #64748b;
+  }
+}
+
+:root[data-theme="dark"] .viz-root {
+  --surface-1: #1a1a19;
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+  --series-5: #d55181;
+  --series-6: #9085e9;
+  --series-mine: #ffffff;
+  --series-muted: #64748b;
+}
+
+/* The written guide.
+ *
+ * Quarto renders the prose (docs/index.qmd) and only the article body is kept,
+ * so none of its stylesheet comes with it -- these rules are what give it the
+ * app's type. Scoped to .guide-prose so nothing here reaches the UI.
+ *
+ * Weight, not lightness, separates the tiers: body copy sits at slate-600,
+ * which clears WCAG AA on white, and headings carry their own weight. */
+.guide-prose {
+  color: var(--color-slate-600);
+  /* Prose, not UI: a touch larger again than the app's body text. */
+  font-size: 1.0625rem;
+  line-height: 1.75;
+  max-width: 46rem;
+}
+
+.guide-prose > :first-child {
+  margin-top: 0;
+}
+
+.guide-prose h1 {
+  font-size: 2.25rem;
+  margin-bottom: 0.25rem;
+  color: var(--color-slate-900);
+}
+
+.guide-prose h2 {
+  font-size: 1.5rem;
+  margin-top: 2.5rem;
+  padding-bottom: 0.3rem;
+  border-bottom: 1px solid var(--color-slate-200);
+  color: var(--color-slate-900);
+}
+
+.guide-prose h3 {
+  font-size: 1.15rem;
+  margin-top: 1.75rem;
+  color: var(--color-slate-900);
+}
+
+.guide-prose p,
+.guide-prose li {
+  margin: 0.85rem 0;
+}
+
+.guide-prose a {
+  color: #4260f5;
+  text-decoration: underline;
+  text-decoration-color: var(--color-slate-300);
+  text-underline-offset: 2px;
+}
+
+.guide-prose a:hover {
+  text-decoration-color: var(--color-slate-900);
+}
+
+.guide-prose code {
+  font-size: 0.875em;
+  color: var(--color-slate-900);
+  background: var(--color-slate-100);
+  padding: 0.1em 0.3em;
+  border-radius: 3px;
+}
+
+/* Wide content scrolls inside its own box rather than widening the page. */
+.guide-prose table {
+  display: block;
+  overflow-x: auto;
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9375rem;
+  margin: 1.25rem 0;
+}
+
+.guide-prose th,
+.guide-prose td {
+  text-align: left;
+  padding: 0.5rem 1rem 0.5rem 0;
+  border-bottom: 1px solid var(--color-slate-100);
+}
+
+.guide-prose th {
+  font-weight: 600;
+  color: var(--color-slate-900);
+  border-bottom-color: var(--color-slate-200);
+}
+
+/* Quarto's callouts, restated: the markup survives, its stylesheet does not. */
+.guide-prose .callout-note {
+  border-left: 3px solid #4260f5;
+  background: var(--color-slate-50);
+  padding: 0.75rem 1rem;
+  margin: 1.5rem 0;
+  border-radius: 0 4px 4px 0;
+}
+
+.guide-prose .callout-note > :first-child {
+  margin-top: 0;
+}
+
+.guide-prose .callout-note > :last-child {
+  margin-bottom: 0;
+}
+
+/* The placeholder banner, while the guide is unwritten. */
+.guide-prose .coming-soon p {
+  font-family: var(--font-heading);
+  font-size: 1.5rem;
+  color: var(--color-slate-500);
+  text-align: center;
+  padding: 2rem 0;
+}
+
+/* The table of contents Quarto generated, as a quiet sidebar. */
+.guide-toc ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.guide-toc li {
+  margin: 0.3rem 0;
+}
+
+.guide-toc a {
+  color: var(--color-slate-500);
+  text-decoration: none;
+}
+
+.guide-toc a:hover {
+  color: var(--color-slate-900);
+}
+
+/* The guide in dark mode: the prose sets its own colours, so the theme has to
+   reach them explicitly. */
+:root[data-theme="dark"] .guide-prose {
+  color: var(--color-slate-300);
+}
+
+:root[data-theme="dark"] .guide-prose h1,
+:root[data-theme="dark"] .guide-prose h2,
+:root[data-theme="dark"] .guide-prose h3 {
+  color: var(--color-slate-100);
+}
+
+:root[data-theme="dark"] .guide-prose h2 {
+  border-bottom-color: var(--color-slate-700);
+}
+
+:root[data-theme="dark"] .guide-prose a {
+  color: #8ba4ff;
+  text-decoration-color: var(--color-slate-600);
+}
+
+:root[data-theme="dark"] .guide-prose a:hover {
+  text-decoration-color: var(--color-slate-200);
+}
+
+:root[data-theme="dark"] .guide-prose code {
+  color: var(--color-slate-100);
+  background: var(--color-slate-800);
+}
+
+:root[data-theme="dark"] .guide-prose th {
+  color: var(--color-slate-100);
+  border-bottom-color: var(--color-slate-700);
+}
+
+:root[data-theme="dark"] .guide-prose td {
+  border-bottom-color: var(--color-slate-800);
+}
+
+:root[data-theme="dark"] .guide-prose .callout-note {
+  background: var(--color-slate-900);
+}
+
+:root[data-theme="dark"] .guide-prose .coming-soon p {
+  color: var(--color-slate-400);
+}
+
+:root[data-theme="dark"] .guide-toc a {
+  color: var(--color-slate-400);
+}
+
+:root[data-theme="dark"] .guide-toc a:hover {
+  color: var(--color-slate-100);
+}

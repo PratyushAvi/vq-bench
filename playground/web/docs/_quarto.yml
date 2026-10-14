@@ -1,0 +1,23 @@
+# The written guide's source.
+#
+# Quarto renders a whole HTML document here, but none of it ships: docs/
+# extract.mjs keeps only the article body and the table of contents, and the
+# app renders those inside its own page (src/components/Guide.tsx).
+#
+# That is deliberate. Serving Quarto's own page meant two sets of chrome to
+# keep in step -- and Bootstrap's `html { font-size: 17px }` rescaled every rem
+# in the app's design, so the shared navbar came out a different height.
+project:
+  type: website
+  # Not public/: this output is an intermediate, not something to deploy.
+  output-dir: .rendered
+
+format:
+  html:
+    # Bootstrap is only needed for the callout markup; its stylesheet is
+    # discarded with the rest of the page.
+    theme: cosmo
+    toc: true
+    toc-title: "On this page"
+    section-divs: true
+    anchor-sections: true

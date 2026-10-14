@@ -1,0 +1,12 @@
+# Cloudflare Pages reads this from the build output root.
+#
+# Everything under assets/ is content-hashed by Vite, so a changed file gets a
+# changed name: it can be cached permanently and never revalidated.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# data/ keeps stable names across builds -- sota.json and the sample vectors
+# are overwritten in place -- so these must revalidate or a deploy would not
+# reach anyone still holding the old copy.
+/data/*
+  Cache-Control: public, max-age=0, must-revalidate

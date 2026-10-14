@@ -1,0 +1,7 @@
+{
+  "n_base": 1000,
+  "n_eval": 50,
+  "dim": 128,
+  "cand_width": 100,
+  "seed": 1
+}

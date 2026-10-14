@@ -1,0 +1,58 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      // Starts the dev server if it is not already up, then opens Chrome with
+      // the debugger attached: breakpoints in src/*.tsx work directly.
+      "name": "Playground (Chrome)",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:5173",
+      "webRoot": "${workspaceFolder}/web",
+      "preLaunchTask": "web: dev server",
+      "sourceMaps": true
+    },
+    {
+      "name": "Playground (Edge)",
+      "type": "msedge",
+      "request": "launch",
+      "url": "http://localhost:5173",
+      "webRoot": "${workspaceFolder}/web",
+      "preLaunchTask": "web: dev server",
+      "sourceMaps": true
+    },
+    {
+      // An editor-pane preview that still breaks on a breakpoint: Live Preview
+      // hosts the page, and this attaches to it. Needs Vite running, which the
+      // preLaunchTask starts.
+      "name": "Playground (Live Preview pane)",
+      "type": "pwa-msedge",
+      "request": "launch",
+      "url": "http://localhost:5173",
+      "webRoot": "${workspaceFolder}/web",
+      "preLaunchTask": "web: dev server",
+      "sourceMaps": true,
+      "presentation": { "group": "1-preview", "order": 1 }
+    },
+    {
+      // Chrome with devtools docked, for when a real browser window is wanted.
+      "name": "Playground (preview + devtools)",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:5173",
+      "webRoot": "${workspaceFolder}/web",
+      "preLaunchTask": "web: dev server",
+      "runtimeArgs": ["--auto-open-devtools-for-tabs"],
+      "sourceMaps": true
+    },
+    {
+      // The Phase 0 headless harness -- same wasm code path, no browser.
+      "name": "Headless run (Node)",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/tools/run_wasm.mjs",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    }
+  ]
+}

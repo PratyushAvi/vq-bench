@@ -1,0 +1,98 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "web: dev server",
+      "type": "shell",
+      "command": "npm run dev",
+      "options": {
+        "cwd": "${workspaceFolder}/web"
+      },
+      "isBackground": true,
+      "problemMatcher": {
+        "pattern": {
+          "regexp": "^$",
+          "file": 1,
+          "location": 2,
+          "message": 3
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": ".*VITE.*",
+          "endsPattern": ".*Local:.*"
+        }
+      },
+      "presentation": {
+        "reveal": "silent",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "wasm: rebuild",
+      "type": "shell",
+      "command": "./tools/build_wasm.sh",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [
+        "$rustc"
+      ],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "web: smoke test",
+      "type": "shell",
+      "command": "npm run smoke",
+      "options": {
+        "cwd": "${workspaceFolder}/web"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "phase 0: verify parity",
+      "type": "shell",
+      "command": "./tools/verify_phase0.sh",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "web: open preview",
+      "type": "shell",
+      "command": "echo 'Run > Command Palette > Simple Browser: Show > http://localhost:5173'",
+      "dependsOn": [
+        "web: dev server"
+      ],
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "silent",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "web: dev + preview",
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "web: dev server",
+        "web: open preview"
+      ],
+      "problemMatcher": [],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    }
+  ]
+}

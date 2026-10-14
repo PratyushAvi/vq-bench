@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- <link rel="icon" type="image/svg+xml" href="/favicon.svg" /> -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- Fonts are linked here rather than @import-ed from the stylesheet: the
+         CSS bundler strips an @import that follows Tailwind's, which fails
+         silently (the page falls back to a system serif, or to a locally
+         installed copy on the author's own machine). Preconnect first so the
+         faces are not blocked behind a fresh TLS handshake. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preconnect" href="https://api.fontshare.com" />
+    <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&family=Indie+Flower&display=swap"
+    />
+    <!-- One link per family. Fontshare's multi-family URLs are unreliable:
+         combining families silently drops some and returns unrelated ones, and
+         a dropped face then falls back to a system serif with no error. Each
+         response also carries a few bundled extras, harmless as long as nothing
+         references them. -->
+    <link
+      rel="stylesheet"
+      href="https://api.fontshare.com/v2/css?f%5B%5D=gambetta@300,400,500,700&display=swap"
+    />
+    <link rel="stylesheet" href="https://api.fontshare.com/v2/css?f%5B%5D=gambarino@400&display=swap" />
+    <title>VQ-bench Playground</title>
+    <!-- Applied before first paint: reading the choice from React would show
+         a flash of the wrong theme on every load. Kept tiny and inline for
+         that reason, and mirrors lib/theme.ts. -->
+    <script>
+      (function () {
+        try {
+          var saved = localStorage.getItem("vq-theme");
+          var dark =
+            saved === "dark" ||
+            ((saved === null || saved === "system") &&
+              window.matchMedia("(prefers-color-scheme: dark)").matches);
+          document.documentElement.dataset.theme = dark ? "dark" : "light";
+        } catch (e) {
+          document.documentElement.dataset.theme = "light";
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

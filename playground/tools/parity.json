@@ -1,0 +1,49 @@
+{
+  "datasets": [
+    "llama-128-ip"
+  ],
+  "seed": 1,
+  "k": [
+    1,
+    10
+  ],
+  "n_reconstruct": 100,
+  "methods": [
+    {
+      "name": "minmax",
+      "b": [
+        2,
+        6
+      ]
+    },
+    {
+      "name": "e_rabitq",
+      "b": [
+        2,
+        4
+      ]
+    },
+    {
+      "name": "pq",
+      "section_dim": 8,
+      "centroids": 256
+    },
+    {
+      "name": "opq",
+      "section_dim": 8,
+      "centroids": 256
+    },
+    {
+      "name": "turboquant_mse",
+      "b": 4
+    },
+    {
+      "name": "itq"
+    }
+  ],
+  "metrics": [
+    "recall",
+    "mse_score",
+    "mse_recon"
+  ]
+}

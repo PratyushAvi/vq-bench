@@ -1,0 +1,28 @@
+{
+  // rust-analyzer needs the fork's workspace root, not the repo root.
+  "rust-analyzer.linkedProjects": ["vendor/vq-bench/Cargo.toml"],
+  // The wasm crate only type-checks meaningfully for its real target.
+  "rust-analyzer.cargo.target": "wasm32-unknown-unknown",
+  // Live Preview opens the app in an editor pane. It is pointed at Vite's own
+  // server rather than serving web/ itself: this app is not static -- it needs
+  // Vite for TypeScript, HMR, and the module worker the wasm runs in -- so the
+  // built-in static server would only ever show an unbuilt index.html.
+  "livePreview.defaultPreviewPath": "/",
+  "livePreview.portNumber": 5173,
+  "livePreview.openPreviewTarget": "Embedded Preview",
+  "livePreview.serverKeepAliveAfterEmbeddedPreviewClose": 3,
+
+  // Live Server (the other installed one) would serve the same unbuilt files,
+  // so keep it off this workspace's root.
+  "liveServer.settings.NoBrowser": true,
+
+  // Simple Browser is the no-extension fallback; the lock indicator only gets
+  // in the way for a local preview.
+  "simpleBrowser.focusLockIndicator.enabled": false,
+  "files.exclude": {
+    "**/target": true,
+    "**/node_modules": true,
+    "**/pkg": true,
+    "**/pkg-web": true
+  }
+}
