@@ -33,7 +33,7 @@ const EXPECTED = [
  */
 async function selectOnly(page, family) {
   await page.getByRole("button", { name: "none", exact: true }).click();
-  await page.getByRole("checkbox", { name: `run ${family}` }).check();
+  await page.getByRole("checkbox", { name: `run ${family}`, exact: true }).check();
 }
 
 let failed = 0;
@@ -97,7 +97,7 @@ check("the random point set is first",
   String(await datasetBoxes.first().getAttribute("aria-label")));
 
 const families = await page.getByRole("checkbox", { name: /^run / }).count();
-check("the registry populates the method list", families === 15, `${families} families`);
+check("the registry populates the method list", families === 16, `${families} families`);
 
 for (const { key, label, recall10 } of EXPECTED) {
   await selectOnly(page, label);

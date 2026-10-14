@@ -5,16 +5,16 @@ The full results JSON is ~900 KB of every metric for 59 methods across 10
 datasets. The playground needs one curve per family -- recall@10 against bits
 per dimension -- so this keeps that and drops the rest.
 
-Source: vendor/vq-bench/docs/results/aug-2026.json, the same file behind the
+Source: ../docs/results/aug-2026.json, the same file behind the
 table on vq-bench.com. Regenerate after syncing the fork with upstream.
 """
 import json
 import pathlib
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-SOURCE = ROOT / "vendor/vq-bench/docs/results/aug-2026.json"
+SOURCE = ROOT.parent / "docs/results/aug-2026.json"
 DEST = ROOT / "web/public/data/sota.json"
-REGISTRY_SOURCE = ROOT / "vendor/vq-bench/src/bin/vqb/registry.rs"
+REGISTRY_SOURCE = ROOT.parent / "src/bin/vqb/registry.rs"
 REGISTRY_DEST = ROOT / "web/public/data/datasets.json"
 
 # The five strongest families by mean recall@10 near 4 bits/dim, measured over

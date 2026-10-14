@@ -4,7 +4,7 @@
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-crate="$root/vendor/vq-bench/crates/vqb-wasm"
+crate="$root/../crates/vqb-wasm"
 
 # getrandom 0.3+ needs this cfg to select its browser backend.
 ( cd "$crate" && RUSTFLAGS='--cfg getrandom_backend="wasm_js"' \

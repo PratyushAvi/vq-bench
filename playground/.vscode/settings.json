@@ -1,6 +1,6 @@
 {
-  // rust-analyzer needs the fork's workspace root, not the repo root.
-  "rust-analyzer.linkedProjects": ["vendor/vq-bench/Cargo.toml"],
+  // rust-analyzer needs the workspace root, one level up from playground/.
+  "rust-analyzer.linkedProjects": ["../Cargo.toml"],
   // The wasm crate only type-checks meaningfully for its real target.
   "rust-analyzer.cargo.target": "wasm32-unknown-unknown",
   // Live Preview opens the app in an editor pane. It is pointed at Vite's own

@@ -13,35 +13,21 @@ lets you compose your own quantizer from vq-bench's primitives.
 
 ## Layout
 
+The playground lives inside a fork of vq-bench: the repo root is the (lightly patched)
+library, and this directory is the web app built on it. Paths below are from the repo root.
+
 ```
-vendor/vq-bench/           our fork (branch `playground`, `upstream` remote set)
-  src/metrics.rs           metrics, moved out of the CLI so a library user can call them
-  crates/vqb-wasm/         the WASM wrapper -- the only Rust we maintain
-tools/                     Phase 0 harness, wasm build, published-results extraction
-web/                       the playground UI (Vite + React + Tailwind)
-  src/lib/                 wasm worker, dataset + .h5 loading, run history
-  src/components/          nav, landing, pickers, editor, charts, results, history
-  test/smoke.mjs           drives the real UI in Chromium
-```
-
-## Getting the fork
-
-`vendor/vq-bench` is not tracked by this repo yet — making it a submodule needs a fork
-URL on your own account. Its two Phase 0 commits live in its own git history. To
-recreate it from scratch:
-
-```sh
-git clone https://github.com/pinecone-io/vq-bench vendor/vq-bench
-cd vendor/vq-bench && git remote rename origin upstream && git checkout -b playground
+src/metrics.rs             metrics, moved out of the CLI so a library user can call them
+crates/vqb-wasm/           the WASM wrapper -- the only Rust we maintain
+playground/
+  tools/                   Phase 0 harness, wasm build, published-results extraction
+  web/                     the playground UI (Vite + React + Tailwind)
+    src/lib/               wasm worker, dataset + .h5 loading, run history
+    src/components/        nav, landing, pickers, editor, charts, results, history
+    test/smoke.mjs         drives the real UI in Chromium
 ```
 
-then re-apply the two changes described under [Fork changes](#fork-changes). Once you
-have pushed your fork:
-
-```sh
-cd vendor/vq-bench && git remote add origin git@github.com:<you>/vq-bench.git && git push -u origin playground
-cd ../.. && git submodule add git@github.com:<you>/vq-bench.git vendor/vq-bench
-```
+Commands in the rest of this README run from `playground/`.
 
 ## Running the playground
 
@@ -50,18 +36,18 @@ cd web && npm install && npm run dev
 ```
 
 `web/src/wasm/` and `web/public/data/` are **committed**, so a fresh clone runs and
-builds with only Node — no Rust toolchain, no fork. That is what lets a static host
-build the site from this repo alone.
+builds with only Node — no Rust toolchain. That is what lets a static host build the
+site from `playground/web` alone.
 
 The cost is that the binary can drift from the crate it was built from: after any
-change to `vendor/vq-bench`, re-run
+change to the Rust code (the library or `crates/vqb-wasm`), re-run
 
 ```sh
 ./tools/build_wasm.sh          # wasm module + sample dataset into web/
 ```
 
-and commit the result, or the app keeps running the previous build. Making the fork
-a submodule and building in CI is the better long-term answer.
+and commit the result, or the app keeps running the previous build. Building the wasm
+in CI is the better long-term answer.
 
 ### Using it
 
@@ -204,7 +190,7 @@ Four exported functions, kept deliberately small so UI work rarely needs a Rust 
 
 | function | purpose |
 |---|---|
-| `list_quantizers()` | every family, from the live registry (15 today) |
+| `list_quantizers()` | every family, from the live registry (16 today) |
 | `list_metrics()` | every metric this build reports (9) |
 | `validate_config(json, dim)` | the dry run: names, params, values -- computes nothing |
 | `run(json, base, eval, dim, candidates, cand_width)` | fit, encode, score, reconstruct |
@@ -234,8 +220,13 @@ Kept minimal and additive so rebasing onto upstream stays cheap:
 Syncing upstream:
 
 ```sh
-cd vendor/vq-bench && git fetch upstream && git rebase upstream/main
+git remote add upstream https://github.com/pinecone-io/vq-bench.git   # once
+git fetch upstream && git merge upstream/main
 ```
+
+Merge rather than rebase: the branch also carries the playground's history, which a
+rebase would flatten. Upstream never touches `playground/`, so conflicts can only come
+from the fork changes above. Rebuild the wasm afterwards.
 
 New quantizers and metrics then appear in the playground automatically, since both lists
 are read from the registry rather than hardcoded.

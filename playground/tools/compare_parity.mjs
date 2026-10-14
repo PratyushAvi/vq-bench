@@ -11,7 +11,7 @@ import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
-const wasm = require(join(here, "../vendor/vq-bench/crates/vqb-wasm/pkg/vqb_wasm.js"));
+const wasm = require(join(here, "../../crates/vqb-wasm/pkg/vqb_wasm.js"));
 
 const [nativePath, configPath] = process.argv.slice(2);
 if (!nativePath || !configPath) {

@@ -7,7 +7,7 @@
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-fork="$root/vendor/vq-bench"
+fork="$(cd "$root/.." && pwd)"
 cd "$root"
 
 step() { printf '\n\033[1m== %s\033[0m\n' "$1"; }
