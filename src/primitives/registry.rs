@@ -54,7 +54,25 @@ pub fn primitives() -> Vec<PrimitiveSpec> {
         stateless!("center", Center),
         stateless!("normalize", Normalize),
         stateless!("absmax", AbsMax),
-        stateless!("pca_rotate", PcaRotate),
+        PrimitiveSpec {
+            key: "pca_rotate",
+            display: <PcaRotate as Primitive>::name(),
+            params: &["rank"],
+            describe: <PcaRotate as Primitive>::describe(),
+            // Checked here rather than left to PcaRotate's asserts, which would
+            // panic mid-fit instead of failing validation.
+            build: |p, _, dim| {
+                let rank = get_or(p, "rank", dim)?;
+                if rank == 0 || rank > dim {
+                    bail!("pca_rotate: rank must be in 1..={dim}, got {rank}");
+                }
+                Ok(Box::new(if rank == dim {
+                    PcaRotate::default()
+                } else {
+                    PcaRotate::truncated(rank)
+                }))
+            },
+        },
         PrimitiveSpec {
             key: "minmax",
             display: <MinMax as Primitive>::name(),
